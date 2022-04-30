@@ -1,0 +1,10 @@
+lightgbm==2.2.3
+matplotlib==3.5.1
+# numpy==1.21.6 
+pandas
+Pillow
+plotly
+seaborn
+shap
+streamlit
+streamlit_shap
