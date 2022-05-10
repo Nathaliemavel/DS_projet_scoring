@@ -42,6 +42,7 @@ df = pd.read_csv('./DATAS/app_test_reduce_2000.csv')
 # Load model
 with open('./model_lgb.pickle', 'rb') as file : 
     LGB = pickle.load(file)
+    
 
 # Logo "Prêt à dépenser"
 from PIL import Image
@@ -49,7 +50,7 @@ image = Image.open('./logo.png')
 st.sidebar.image(image, width=280)
 
 # Loan acceptance threshold
-treshold = 0.44
+treshold = 0.5
 
 ################ -APP- #######################
 # Title
@@ -70,19 +71,20 @@ def data_select_id(id, df):
 # ################################################
 # Personnal information client
 df_client = data_select_id(select_sk_id, df)
-index_client = list(df_client.index)
+df_client = df_client.drop(['SK_ID_CURR'], axis=1)
+index_client = df_client.index
 
 if st.sidebar.checkbox('Show personal data'):
     st.header('PERSONAL INFORMATION')
-    st.write("**Age** : {:.0f} ans".format(abs(int(df_client["DAYS_BIRTH"]/365))))
+    st.write("**Age** : {:.0f} ans".format(abs(int(df_client["DAYS_BIRTH_x"]/365))))
     st.write("**Number of children** : {:.0f}".format(df_client["CNT_CHILDREN"].values[0]))
-    if df_client["CODE_GENDER_F"].values[0] ==1:
+    if df_client["CODE_GENDER_F"].values[0]==1:
         st.write("**Gender** : Female")
-    elif df_client["CODE_GENDER_F"].values[0] ==0 : 
+    elif df_client["CODE_GENDER_F"].values[0]==0 : 
         st.write("**Gender** : Male")
 
     st.header('TECHNICAL INFORMATION')
-    column_radar_2 = ['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']
+    column_radar_2 = ['EXT_SOURCE_1_x', 'EXT_SOURCE_2_x', 'EXT_SOURCE_3_x']
     radar = df_client[column_radar_2].values[0]
     # fig_radar, ax = plt.subplots(2)
     fig_radar, ax = plt.subplots(figsize=(10, 5))
@@ -113,18 +115,18 @@ if st.sidebar.checkbox('Score and decision'):
     st.header('Score and decision')
     LGB_SCORE = (LGB.predict_proba(df_client)[:, 1]).round(3)
     LGB_SCORE = list(map(float, LGB_SCORE))
-    st.info('Score : '+ str(LGB_SCORE[0]))
-    st.write('')
+    st.info('Default in repayment  : '+ str(LGB_SCORE[0]))
+    st.write('Default in repayment : Probability that the client will not repay the loan')
     result = pd.DataFrame()
     result['score'] = LGB_SCORE
 
     for index, row in  result.iterrows():
-        if float(row['score']) >= treshold :
+        if float(row['score']) <= treshold :
             result.at[index,'decision'] = 'ACCEPT'
-            result.at[index,'decision_bin'] = 1
-        elif float(row['score']) < treshold :
-            result.at[index,'decision'] = 'NO ACCEPT'
             result.at[index,'decision_bin'] = 0
+        elif float(row['score']) > treshold :
+            result.at[index,'decision'] = 'NO ACCEPT'
+            result.at[index,'decision_bin'] = 1
 
     RESULT = result['decision']
     RESULT = list(map(str, RESULT))
@@ -134,7 +136,7 @@ if st.sidebar.checkbox('Score and decision'):
         #    st.write('Decision : ', RESULT[0])
     fig = show_score()
     st.pyplot(fig=plt)
-    st.markdown("**Loan acceptance threshold** is fixed to **0.44**")
+    st.markdown("**Loan acceptance threshold** is fixed to **below 0.5**")
 
 # ################################################
 # EXPLAIN MODEL  
@@ -145,21 +147,22 @@ if st.sidebar.checkbox('Explanation of the rating'):
     with st.spinner('Wait for it...'):
         st.markdown("### **GLOBALS** explanations of the model results\n")
         shap.initjs()
+        df = df.drop(['SK_ID_CURR'], axis=1)
         explainer = shap.TreeExplainer(LGB, feature_perturbation="interventional", model_output="raw")
         shap_values = explainer.shap_values(df)
         shap_values = shap.TreeExplainer(LGB).shap_values(df)
 
         # save and upload
-        fig1, ax = plt.subplots(figsize=(50, 20))
-        shap.summary_plot(shap_values, df)
+        fig1, ax = plt.subplots(figsize=(50, 30))
+        shap.summary_plot(shap_values[1], df)
         # plt.title( "Explanation for SHAP for " + str(select_sk_id))
         create_dir()
-        plt.savefig(PATH_CHARTS +'summary_plot.png', format='png', dpi=100, bbox_inches='tight')
+        plt.savefig(PATH_CHARTS +'summary_plot.png', format='png', dpi=200, bbox_inches='tight')
         shap_image = Image.open(PATH_CHARTS +'summary_plot.png')
-        st.image(shap_image, width=700)
+        st.image(shap_image, width=800)
         
         shap.initjs()
         st.markdown("### **INDIVIDUAL** explanation of the model result\n")
-        st_shap(shap.force_plot(explainer.expected_value[1], shap_values[1][index_client[0],:], df.iloc[index_client[0]]))
+        st_shap(shap.force_plot(explainer.expected_value[1], shap_values[1][index_client,:], df.iloc[index_client]))
         # time.sleep()
     st.success('success to load explanation SHAP(SHapley Additive exPlanations) for id  : '+str(select_sk_id))
