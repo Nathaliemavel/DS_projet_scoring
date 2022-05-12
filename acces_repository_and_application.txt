@@ -1,0 +1,9 @@
+Bonjour, 
+Vous pouvez retrouvez l'ensemble du projet sur le repo disponible à cette adresse : 
+https://github.com/Nathaliemavel/DS_projet_scoring.git
+
+Le dashboard est consultable en ligne à cette adresse :  
+https://pretadepenser-may2022.herokuapp.com/  
+
+Cordialement. 
+Nathalie MAVEL
